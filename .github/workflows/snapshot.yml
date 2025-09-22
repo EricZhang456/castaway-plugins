@@ -43,7 +43,7 @@ jobs:
                 repo: context.repo.repo,
                 run_id: workflowRun.id,
               });
-              workflowRunArtifacts.data.artifacts.forEach(artifact => {
+              for (const artifact of workflowRunArtifacts.data.artifacts) {
                 const download = await github.rest.actions.downloadArtifact({
                   owner: context.repo.owner,
                   repo: context.repo.repo,
@@ -51,7 +51,7 @@ jobs:
                   archive_format: 'zip',
                 });
                 fs.writeFileSync(path.join(temp, `${artifact.name}.zip`), Buffer.from(download.data));
-              });
+              }
 
               const newRelease = github.repos.createRelease({
                 owner: context.repo.owner,
@@ -63,7 +63,7 @@ jobs:
                 generate_release_notes: true,
                 draft: true,
               });
-              fs.readdirSync(temp).forEach(file => {
+              for (const file of fs.readdirSync(temp)) {
                 await github.rest.repos.uploadReleaseAsset({
                   owner: context.repo.owner,
                   repo: context.repo.repo,
@@ -71,8 +71,8 @@ jobs:
                   name: file,
                   data: fs.readFileSync(path.join(temp, file)),
                 };
-              });
-              const asdf = await github.rest.repos.updateRelease({
+              }
+              await github.rest.repos.updateRelease({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
                 release_id: newRelease.data.id,
