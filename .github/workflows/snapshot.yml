@@ -70,7 +70,7 @@ jobs:
                   release_id: newRelease.data.id,
                   name: file,
                   data: fs.readFileSync(path.join(temp, file)),
-                };
+                });
               }
               await github.rest.repos.updateRelease({
                 owner: context.repo.owner,
