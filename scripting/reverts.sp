@@ -20,6 +20,10 @@
 #undef MEMORY_PATCHES
 #endif
 
+#if defined MODERN_SOURCEMOD
+#undef MODERN_SOURCEMOD
+#endif
+
 //#define WIN32
 /*
  ^ ^ ^ ^ ^ ^ ^ ^ ^
@@ -53,6 +57,16 @@
 #define PLUGIN_AUTHOR "Bakugo, NotnHeavy, random, huutti, VerdiusArcana, MindfulProtons, EricZhang456"
 
 #define PLUGIN_VERSION_NUM "2.0.0"
+
+#if SOURCEMOD_V_MAJOR == 1 && SOURCEMOD_V_MINOR >= 13
+#define MODERN_SOURCEMOD
+#endif
+
+#if defined MODERN_SOURCEMOD && defined MEMORY_PATCHES
+#warning "Compiling for SourceMod 1.13 or later. Disabling memory patches."
+#undef MEMORY_PATCHES
+#endif
+
 // Add a OS suffix if Memorypatch reverts are used
 // to make it easier to see which OS the plugin is compiled for. 
 // To server owners, before you raise hell, do: sm plugins list 
@@ -408,10 +422,10 @@ DynamicDetour dhook_CTFPlayerShared_AddToSpyCloakMeter;
 DynamicDetour dhook_CWeaponMedigun_FindAndHealTargets;
 DynamicDetour dhook_CTFLunchBox_ApplyBiteEffects;
 
-Address CBaseObject_m_flHealth; // *((float *)a1 + 652)
-Address CObjectSentrygun_m_flShieldFadeTime; // *((float *)this + 712)
-Address CWeaponMedigun_m_bReloadDown; // *((_BYTE *)this + 2059)
-Address CTFPlayerShared_m_flFeignDeathEnd;
+// Address CBaseObject_m_flHealth; // *((float *)a1 + 652)
+// Address CObjectSentrygun_m_flShieldFadeTime; // *((float *)this + 712)
+// Address CWeaponMedigun_m_bReloadDown; // *((_BYTE *)this + 2059)
+// Address CTFPlayerShared_m_flFeignDeathEnd;
 
 // OS-Specific m_ offsets for *EntData usage (Such as GetEntDataFloat) when they are private/protected/non-networked
 // (as in they cannot be found in datamaps/netprop).
@@ -921,10 +935,10 @@ public void OnPluginStart() {
 		dhook_CWeaponMedigun_FindAndHealTargets = DynamicDetour.FromConf(conf, "CWeaponMedigun::FindAndHealTargets");
 		dhook_CTFLunchBox_ApplyBiteEffects = DynamicDetour.FromConf(conf, "CTFLunchBox::ApplyBiteEffects");
 
-		CBaseObject_m_flHealth = view_as<Address>(FindSendPropInfo("CBaseObject", "m_bHasSapper") - 4);
-		CObjectSentrygun_m_flShieldFadeTime = view_as<Address>(FindSendPropInfo("CObjectSentrygun", "m_nShieldLevel") + 4);
-		CWeaponMedigun_m_bReloadDown = view_as<Address>(FindSendPropInfo("CWeaponMedigun", "m_nChargeResistType") + 11);
-		CTFPlayerShared_m_flFeignDeathEnd = view_as<Address>(FindSendPropInfo("CTFPlayer", "m_bFeignDeathReady") - 4);
+		// CBaseObject_m_flHealth = view_as<Address>(FindSendPropInfo("CBaseObject", "m_bHasSapper") - 4);
+		// CObjectSentrygun_m_flShieldFadeTime = view_as<Address>(FindSendPropInfo("CObjectSentrygun", "m_nShieldLevel") + 4);
+		// CWeaponMedigun_m_bReloadDown = view_as<Address>(FindSendPropInfo("CWeaponMedigun", "m_nChargeResistType") + 11);
+		// CTFPlayerShared_m_flFeignDeathEnd = view_as<Address>(FindSendPropInfo("CTFPlayer", "m_bFeignDeathReady") - 4);
 
 		// Load OS Specific Member offsets from reverts.txt for non-memorypatching purposes.
 		m_flTauntNextStartTime = -1;
@@ -1994,7 +2008,7 @@ public void OnGameFrame() {
 								) {
 									TF2_AddCondition(idx, TFCond_DeadRingered, 6.0, idx);
 									StoreToAddress(
-										GetEntityAddress(idx) + CTFPlayerShared_m_flFeignDeathEnd,
+										GetEntityAddress(idx) + GetSendPropInfoAddress("CTFPlayer", "m_bFeignDeathReady", -4),
 										GetGameTime() + 6.0,
 										NumberType_Int32
 									);
@@ -3501,7 +3515,7 @@ public Action Event_OnPlayerDeath(Event event, const char[] name, bool dontBroad
 				if (GetEntProp(sentry, Prop_Send, "m_bPlayerControlled") > 0) {
 					
 					// Offset to m_flShieldFadeTime and input our own value.
-					StoreToAddress(GetEntityAddress(sentry) + CObjectSentrygun_m_flShieldFadeTime, GetGameTime() + 1.0, NumberType_Int32);
+					StoreToAddress(GetEntityAddress(sentry) + GetSendPropInfoAddress("CObjectSentrygun", "m_nShieldLevel", 4), GetGameTime() + 1.0, NumberType_Int32);
 
 					// Set m_bPlayerControlled to 0 such that the original code
 					// wouldn't set the shield fade time to 3 seconds, thus undoing our revert.
@@ -5439,7 +5453,7 @@ void SDKHookCB_OnTakeDamagePost(
 					TF2_IsPlayerInCondition(victim, TFCond_DeadRingered)
 				) {
 					// dead ringer buff reduction
-					Address m_flFeignDeathEnd = GetEntityAddress(victim) + CTFPlayerShared_m_flFeignDeathEnd;
+					Address m_flFeignDeathEnd = GetEntityAddress(victim) + GetSendPropInfoAddress("CTFPlayer", "m_bFeignDeathReady", -4);
 					float feign_end = LoadFromAddress(m_flFeignDeathEnd, NumberType_Int32);
 					StoreToAddress(m_flFeignDeathEnd, feign_end - damage * 0.01667, NumberType_Int32);
 					// ^ would like to know the exact formula here, this is an approximation of the tick-based formula what was used in the plugin
@@ -7071,7 +7085,8 @@ MRESReturn DHookCallback_CObjectSentrygun_StartBuilding(int entity, DHookReturn 
 		GetEntProp(entity, Prop_Send, "m_bMiniBuilding")
 	) {
 		// Mini sentries always start off at max health.
-		StoreToAddress(GetEntityAddress(entity) + CBaseObject_m_flHealth, float(GetEntProp(entity, Prop_Send, "m_iMaxHealth")), NumberType_Int32);
+		StoreToAddress(GetEntityAddress(entity) + GetSendPropInfoAddress("CBaseObject", "m_bHasSapper", -4),
+			float(GetEntProp(entity, Prop_Send, "m_iMaxHealth")), NumberType_Int32);
 	}
 	return MRES_Ignored;
 }
@@ -7082,7 +7097,7 @@ MRESReturn DHookCallback_CObjectSentrygun_Construct_Pre(int entity, DHookReturn 
 		GetEntProp(entity, Prop_Send, "m_bBuilding") &&
 		GetEntProp(entity, Prop_Send, "m_bMiniBuilding")
 	) {
-		Address m_flHealth = GetEntityAddress(entity) + CBaseObject_m_flHealth;
+		Address m_flHealth = GetEntityAddress(entity) + GetSendPropInfoAddress("CBaseObject", "m_bHasSapper", -4);
 		entities[entity].minisentry_health = view_as<float>(LoadFromAddress(m_flHealth, NumberType_Int32));
 	}
 	return MRES_Ignored;
@@ -7094,7 +7109,7 @@ MRESReturn DHookCallback_CObjectSentrygun_Construct_Post(int entity, DHookReturn
 		GetEntProp(entity, Prop_Send, "m_bBuilding") &&
 		GetEntProp(entity, Prop_Send, "m_bMiniBuilding")
 	) {
-		Address m_flHealth = GetEntityAddress(entity) + CBaseObject_m_flHealth;
+		Address m_flHealth = GetEntityAddress(entity) + GetSendPropInfoAddress("CBaseObject", "m_bHasSapper", -4);
 		if (SDKCall(sdkcall_CBaseObject_GetReversesBuildingConstructionSpeed, entity))
 			StoreToAddress(m_flHealth, view_as<float>(LoadFromAddress(m_flHealth, NumberType_Int32)) - 0.5, NumberType_Int32);
 		else if (GetItemVariant(Wep_Gunslinger) == 0) {
@@ -7408,7 +7423,7 @@ MRESReturn DHookCallback_CWeaponMedigun_ItemPostFrame(int entity) {
 	) {
 		if (players[owner].using_vaccinator_uber) {
 			// Prevent resistance cycling while Ubering with the Vaccinator.
-			StoreToAddress(GetEntityAddress(entity) + CWeaponMedigun_m_bReloadDown, true, NumberType_Int8);
+			StoreToAddress(GetEntityAddress(entity) + GetSendPropInfoAddress("CWeaponMedigun", "m_nChargeResistType", 11), true, NumberType_Int8);
 		}
 	}
 	return MRES_Ignored;
@@ -7528,6 +7543,12 @@ MRESReturn DHookCallback_CTFLunchBox_ApplyBiteEffects_Post(int entity, DHookPara
 		}
 	}
 	return MRES_Ignored;
+}
+
+// util functions
+
+int GetSendPropInfoAddress(const char[] class, const char[] prop, int offset) {
+	return FindSendPropInfo(class, prop) + offset;
 }
 
 stock bool PlayerIsInvulnerable(int client) {
