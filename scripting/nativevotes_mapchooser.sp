@@ -318,11 +318,6 @@ public void OnMapEnd()
 	
 	char map[PLATFORM_MAX_PATH];
 	GetCurrentMap(map, sizeof(map));
-
-	if (StrContains(map,"mge_")!= -1) {
-		return;
-	}
-
 	RemoveStringFromArray(g_OldMapList, map);
 	g_OldMapList.PushString(map);
 				
