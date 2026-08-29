@@ -49,6 +49,8 @@ bool g_bIsMapAllowed = true;
 Handle g_tRoundResetTimer;
 ArrayList g_aMapExclusionList;
 
+Handle resetTeamsRoundWinCall;
+
 public void Event_RoundWin(Event event, const char[] name, bool dontBroadcast)
 {
 	delete g_tRoundResetTimer;
@@ -96,6 +98,16 @@ public void OnPluginStart()
 	HookEvent("teamplay_win_panel", Event_RoundWin, EventHookMode_PostNoCopy);
 	HookEvent("teamplay_round_start", Event_RoundStart, EventHookMode_PostNoCopy);
 	HookEvent("player_team", Event_PlayerTeam, EventHookMode_Pre);
+
+	GameData gamedata = new GameData("votescramble.games");
+	if (!gamedata) {
+		SetFailState("Cannot open gamedata");
+	}
+	StartPrepSDKCall(SDKCall_GameRules);
+	if (!PrepSDKCall_SetFromConf(gamedata, SDKConf_Signature, "CTeamplayRoundBasedRules::ResetTeamsRoundWinTracking")) {
+		SetFailState("Cannot loaad CTeamplayRoundBasedRules::ResetTeamsRoundWinTracking signature");
+	}
+	resetTeamsRoundWinCall = EndPrepSDKCall();
 
 	AutoExecConfig(true);
 }
@@ -530,6 +542,7 @@ void ScheduleScramble(bool roundStart=false)
 void ImmediateScramble() {
 	g_bScrambleTeamsInProgress = true;
 	ScrambleTeams();
+	SDKCall(resetTeamsRoundWinCall);
 	g_bScrambleTeamsInProgress = false;
 }
 
