@@ -13,22 +13,37 @@ public Plugin myinfo = {
 	url = "https://castaway.tf"
 };
 
+enum OperatingSystem {
+	LINUX = 0,
+	WINDOWS,
+	MAC,
+	LINUX64,
+	WINDOWS64,
+	MAC64
+}
+
 ArrayList g_MapsExceptedFromForcedStalemates; // We use this instead of constantly loading the exceptions file.
 ConVar cvar_temp_disable_forcestalemate; // If tempDisable true: Current map will not have SD. Resets to 0
 ConVar cvar_use_regex_pattern;
-MemoryPatch patch_ForceAlways_StalemateOrOvertime;
+MemoryPatch patch_ForceAlways_StalemateOrOvertime_1;
+MemoryPatch patch_ForceAlways_StalemateOrOvertime_2;
 bool g_shouldStalemate;
 int gamerules;
-
+OperatingSystem operatingSystem;
 
 public void OnPluginStart() {
-	Handle conf;
-	conf = LoadGameConfigFile("stalemate");
+	GameData conf = new GameData("stalemate");
 	if (conf == null) SetFailState("Failed to load stalemate conf");
-	patch_ForceAlways_StalemateOrOvertime = 
+    operatingSystem = view_as<OperatingSystem>(conf.GetOffset("OperatingSystem"));
+	patch_ForceAlways_StalemateOrOvertime_1 =
 		MemoryPatch.CreateFromConf(conf,
-		"ForceAlways_StalemateOrOvertime");
-	if (!ValidateAndNullCheck(patch_ForceAlways_StalemateOrOvertime)) SetFailState("Failed to create ForceAlways_StalemateOrOvertime");
+		"ForceAlways_StalemateOrOvertime_1");
+    if (IsLinux()) {
+        patch_ForceAlways_StalemateOrOvertime_2 = MemoryPatch.CreateFromConf(conf, "ForceAlways_StalemateOrOvertime_2");
+    }
+
+	if (!ValidateAndNullCheck(patch_ForceAlways_StalemateOrOvertime_1)) SetFailState("Failed to create ForceAlways_StalemateOrOvertime_1");
+	if (IsLinux() && !ValidateAndNullCheck(patch_ForceAlways_StalemateOrOvertime_2)) SetFailState("Failed to create ForceAlways_StalemateOrOvertime_2");
 	delete conf;
 
 	cvar_temp_disable_forcestalemate = CreateConVar("sm_forcestalemate__tempdisable", "0", (PLUGIN_NAME ... " - Temporarily enable/disable forced stalemates (does not disable the plugin itself)."), FCVAR_HIDDEN, true, 0.0, true, 1.0);
@@ -42,11 +57,25 @@ public void OnPluginStart() {
 
 	AutoExecConfig();
 
-	patch_ForceAlways_StalemateOrOvertime.Enable();
+    ApplyStalematePatch(true);
 }
 
 public void OnMapStart() {
 	//g_shouldStalemate = ShouldStalemate();
+}
+
+void ApplyStalematePatch(bool enable) {
+    if (enable) {
+        patch_ForceAlways_StalemateOrOvertime_1.Enable();
+        if (IsLinux()) {
+            patch_ForceAlways_StalemateOrOvertime_2.Enable();
+        }
+    } else {
+        patch_ForceAlways_StalemateOrOvertime_1.Disable();
+        if (IsLinux()) {
+            patch_ForceAlways_StalemateOrOvertime_2.Disable();
+        }
+    }
 }
 
 bool ShouldStalemate() {
@@ -104,18 +133,18 @@ public void OnConfigsExecuted() {
 
 void ApplyBlackList() {
 	if (cvar_temp_disable_forcestalemate.BoolValue) {
-		patch_ForceAlways_StalemateOrOvertime.Disable();
+        ApplyStalematePatch(false);
 		PrintToServer("[ForceStalemate] Forced stalemate on servertime end disabled for current map due to server command!");
 		PrintToServer("[ForceStalemate] Don't forget to do \"sm_forcestalemate__tempdisable 0\" if you used tempdisable for testing.");
 		return;
 	}
 
 	if (IsMapInExceptions()) { // Check if current map is blacklisted.
-		patch_ForceAlways_StalemateOrOvertime.Disable();
+        ApplyStalematePatch(false);
 		PrintToServer("[ForceStalemate] Forced stalemate on servertime end disabled due to current map being blacklisted!");
 	}
  	else {
-		patch_ForceAlways_StalemateOrOvertime.Enable();
+        ApplyStalematePatch(true);
 	}
 }
 
@@ -159,7 +188,7 @@ public void LoadExceptionsFile()
 		TrimString(line);
 		if (line[0] == '\0' || line[0] == '/' || line[0] == ';')
 			continue;
-		
+
 		if (!strlen(line))
 			continue;
 
@@ -226,4 +255,8 @@ Action Command_RecheckExceptions(int args)
 	ApplyBlackList();
 
 	return Plugin_Handled;
+}
+
+bool IsLinux() {
+    return operatingSystem == LINUX || operatingSystem == LINUX64;
 }
