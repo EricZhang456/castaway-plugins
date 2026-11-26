@@ -34,13 +34,13 @@ OperatingSystem operatingSystem;
 public void OnPluginStart() {
 	GameData conf = new GameData("stalemate");
 	if (conf == null) SetFailState("Failed to load stalemate conf");
-    operatingSystem = view_as<OperatingSystem>(conf.GetOffset("OperatingSystem"));
+	operatingSystem = view_as<OperatingSystem>(conf.GetOffset("OperatingSystem"));
 	patch_ForceAlways_StalemateOrOvertime_1 =
 		MemoryPatch.CreateFromConf(conf,
 		"ForceAlways_StalemateOrOvertime_1");
-    if (IsLinux()) {
-        patch_ForceAlways_StalemateOrOvertime_2 = MemoryPatch.CreateFromConf(conf, "ForceAlways_StalemateOrOvertime_2");
-    }
+	if (IsLinux()) {
+		patch_ForceAlways_StalemateOrOvertime_2 = MemoryPatch.CreateFromConf(conf, "ForceAlways_StalemateOrOvertime_2");
+	}
 
 	if (!ValidateAndNullCheck(patch_ForceAlways_StalemateOrOvertime_1)) SetFailState("Failed to create ForceAlways_StalemateOrOvertime_1");
 	if (IsLinux() && !ValidateAndNullCheck(patch_ForceAlways_StalemateOrOvertime_2)) SetFailState("Failed to create ForceAlways_StalemateOrOvertime_2");
@@ -57,7 +57,7 @@ public void OnPluginStart() {
 
 	AutoExecConfig();
 
-    ApplyStalematePatch(true);
+	ApplyStalematePatch(true);
 }
 
 public void OnMapStart() {
@@ -65,17 +65,17 @@ public void OnMapStart() {
 }
 
 void ApplyStalematePatch(bool enable) {
-    if (enable) {
-        patch_ForceAlways_StalemateOrOvertime_1.Enable();
-        if (IsLinux()) {
-            patch_ForceAlways_StalemateOrOvertime_2.Enable();
-        }
-    } else {
-        patch_ForceAlways_StalemateOrOvertime_1.Disable();
-        if (IsLinux()) {
-            patch_ForceAlways_StalemateOrOvertime_2.Disable();
-        }
-    }
+	if (enable) {
+		patch_ForceAlways_StalemateOrOvertime_1.Enable();
+		if (IsLinux()) {
+			patch_ForceAlways_StalemateOrOvertime_2.Enable();
+		}
+	} else {
+		patch_ForceAlways_StalemateOrOvertime_1.Disable();
+		if (IsLinux()) {
+			patch_ForceAlways_StalemateOrOvertime_2.Disable();
+		}
+	}
 }
 
 bool ShouldStalemate() {
@@ -113,7 +113,7 @@ public void Event_RoundStart(Event event, const char[] name, bool dontBroadcast)
 }
 
 public Action Timer_StalemateConfig(Handle timer) {
-    gamerules = FindEntityByClassname(-1, "tf_gamerules");
+	gamerules = FindEntityByClassname(-1, "tf_gamerules");
 	if (g_shouldStalemate) {
 		SetVariantString("1");
 	} else {
@@ -133,18 +133,18 @@ public void OnConfigsExecuted() {
 
 void ApplyBlackList() {
 	if (cvar_temp_disable_forcestalemate.BoolValue) {
-        ApplyStalematePatch(false);
+		ApplyStalematePatch(false);
 		PrintToServer("[ForceStalemate] Forced stalemate on servertime end disabled for current map due to server command!");
 		PrintToServer("[ForceStalemate] Don't forget to do \"sm_forcestalemate__tempdisable 0\" if you used tempdisable for testing.");
 		return;
 	}
 
 	if (IsMapInExceptions()) { // Check if current map is blacklisted.
-        ApplyStalematePatch(false);
+		ApplyStalematePatch(false);
 		PrintToServer("[ForceStalemate] Forced stalemate on servertime end disabled due to current map being blacklisted!");
 	}
  	else {
-        ApplyStalematePatch(true);
+		ApplyStalematePatch(true);
 	}
 }
 
@@ -258,5 +258,5 @@ Action Command_RecheckExceptions(int args)
 }
 
 bool IsLinux() {
-    return operatingSystem == LINUX || operatingSystem == LINUX64;
+	return operatingSystem == LINUX || operatingSystem == LINUX64;
 }
